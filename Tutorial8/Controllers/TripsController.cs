@@ -21,32 +21,57 @@ namespace Tutorial8.Controllers
         [HttpGet]
         public async Task<IActionResult> GetTrips()
         {
-            await using var trips = new SqlConnection("Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;");
-
-            await using var com = new SqlCommand();
-            com.Connection = trips;
-            com.CommandText = "select * from Trip";
-
-            await trips.OpenAsync();
-
-            var reader = await com.ExecuteReaderAsync();
-            
             var tripsDtos = new List<TripDTO>();
+
+            await using var con =
+                new SqlConnection(
+                    "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;");
+            await con.OpenAsync();
+            
+            var tripCmd = new SqlCommand("SELECT * FROM Trip", con);
+            var reader = await tripCmd.ExecuteReaderAsync();
+
             while (await reader.ReadAsync())
             {
                 var tripDTO = new TripDTO
                 {
-                    Id = (int)reader["Id"],
+                    Id = (int)reader["IdTrip"],
                     Name = (string)reader["Name"],
-                    DateFrom = (string)reader["DateFrom"],
-                    DateTo = (string)reader["DateTo"],
+                    Description = (string)reader["Description"],
+                    DateFrom = (DateTime)reader["DateFrom"],
+                    DateTo = (DateTime)reader["DateTo"],
                     MaxPeople = (int)reader["MaxPeople"],
+                    Countries = new List<CountryDTO>()
                 };
+
                 tripsDtos.Add(tripDTO);
             }
+
+            await reader.CloseAsync(); 
             
+            foreach (var trip in tripsDtos)
+            {
+                var countryCmd = new SqlCommand(
+                    "SELECT c.Name FROM Country_Trip ct JOIN Country c ON ct.IdCountry = c.IdCountry WHERE ct.IdTrip = @IdTrip",
+                    con);
+                countryCmd.Parameters.AddWithValue("@IdTrip", trip.Id);
+
+                var countryReader = await countryCmd.ExecuteReaderAsync();
+
+                while (await countryReader.ReadAsync())
+                {
+                    trip.Countries.Add(new CountryDTO
+                    {
+                        Name = (string)countryReader["Name"]
+                    });
+                }
+
+                await countryReader.CloseAsync();
+            }
+
             return Ok(tripsDtos);
         }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetTrip(int id)
