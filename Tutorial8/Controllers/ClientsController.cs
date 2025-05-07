@@ -83,6 +83,84 @@ namespace Tutorial8.Controllers
             return Ok("New client created with id: "+result);
         }
         
+        [HttpPut("{idClient}/trips/{idTrip}")]
+        public async Task<IActionResult> RegisterClient(int idClient,int idTrip , CancellationToken cancellationToken)
+        {
+            await using var con = new SqlConnection(connectionString);
+            await con.OpenAsync(cancellationToken);
+            var checker = new SqlCommand("SELECT 1,MaxPeople FROM Client,Trip WHERE Client.IdClient = @idClient AND Trip.IdTrip=@idTrip ", con);
+            checker.Parameters.AddWithValue("@idClient", idClient);
+            checker.Parameters.AddWithValue("@idTrip", idTrip);
+
+            var reader = await checker.ExecuteReaderAsync(cancellationToken);
+            int maxPeople = 0;
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                maxPeople = (int)reader["MaxPeople"];
+            }
+            else
+            {
+                await reader.CloseAsync();
+                return NotFound("Client or Trip not found");
+            }
+            await reader.CloseAsync();
+            
+            var countCmd = new SqlCommand("SELECT COUNT(*) FROM Client_Trip WHERE IdTrip = @idTrip", con);
+            countCmd.Parameters.AddWithValue("@idTrip", idTrip);
+            var currentCount = (int)(await countCmd.ExecuteScalarAsync(cancellationToken));
+            if (currentCount >= maxPeople)
+                return Conflict("Max participants reached for this trip");
+            
+
+            var alreadyRegistered = new SqlCommand("SELECT 1 FROM Client_Trip WHERE IdClient = @idClient AND IdTrip = @idTrip", con);
+            alreadyRegistered.Parameters.AddWithValue("@idClient", idClient);
+            alreadyRegistered.Parameters.AddWithValue("@idTrip", idTrip);
+            if ((await alreadyRegistered.ExecuteScalarAsync(cancellationToken)) != null)
+                return Conflict("Client is already registered for this trip");
+            
+
+            await using var adder = new SqlCommand(@"
+                INSERT INTO Client_Trip (IdClient,IdTrip,RegisteredAt)
+                VALUES (@IdClient,@IdTrip,@RegisteredAt)",con);
+            adder.Parameters.AddWithValue("@IdClient", idClient);
+            adder.Parameters.AddWithValue("@IdTrip", idTrip);
+            var registeredAt = int.Parse(DateTime.UtcNow.ToString("yyyyMMdd"));
+            adder.Parameters.AddWithValue("@RegisteredAt", registeredAt);
+
+
+
+            
+            await adder.ExecuteNonQueryAsync(cancellationToken);
+            
+            return Ok("Client registered to trip");
+
+        }
+
+        [HttpDelete("{idClient}/trips/{idTrip}")]
+        public async Task<IActionResult> DeleteClient(int idClient,int idTrip, CancellationToken cancellationToken)
+        {
+            await using var con = new SqlConnection(connectionString);
+            var alreadyRegistered = new SqlCommand("SELECT 1 FROM Client_Trip WHERE IdClient = @idClient AND IdTrip = @idTrip", con);
+            alreadyRegistered.Parameters.AddWithValue("@idClient", idClient);
+            alreadyRegistered.Parameters.AddWithValue("@idTrip", idTrip);
+            
+            await con.OpenAsync(cancellationToken);
+            
+            if (await alreadyRegistered.ExecuteScalarAsync(cancellationToken) == null)
+                return NotFound("Client is not registered for this trip");
+            
+            
+            
+            await using var deleter = new SqlCommand(@"
+                DELETE FROM Client_Trip
+                WHERE IdClient=@IdClient AND IdTrip=@IdTrip",con);
+            deleter.Parameters.AddWithValue("@IdClient", idClient);
+            deleter.Parameters.AddWithValue("@IdTrip", idTrip);
+            
+            await deleter.ExecuteNonQueryAsync(cancellationToken);
+            
+            return Ok("Client deleted");
+        }
         
     }
 }
