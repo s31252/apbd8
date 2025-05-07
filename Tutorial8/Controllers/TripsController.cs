@@ -13,25 +13,26 @@ namespace Tutorial8.Controllers
     {
         private readonly ITripsService _tripsService;
 
+        private string connectionString =
+            "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;";
+
         public TripsController(ITripsService tripsService)
         {
             _tripsService = tripsService;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetTrips()
+        [HttpGet("/api/trips")]
+        public async Task<IActionResult> GetTrips(CancellationToken cancellationToken)
         {
             var tripsDtos = new List<TripDTO>();
 
-            await using var con =
-                new SqlConnection(
-                    "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;");
-            await con.OpenAsync();
-            
-            var tripCmd = new SqlCommand("SELECT * FROM Trip", con);
-            var reader = await tripCmd.ExecuteReaderAsync();
+            await using var con = new SqlConnection(connectionString);
+            await con.OpenAsync(cancellationToken);
 
-            while (await reader.ReadAsync())
+            var com = new SqlCommand("SELECT * FROM Trip", con);
+            var reader = await com.ExecuteReaderAsync(cancellationToken);
+
+            while (await reader.ReadAsync(cancellationToken))
             {
                 var tripDTO = new TripDTO
                 {
@@ -47,8 +48,8 @@ namespace Tutorial8.Controllers
                 tripsDtos.Add(tripDTO);
             }
 
-            await reader.CloseAsync(); 
-            
+            await reader.CloseAsync();
+
             foreach (var trip in tripsDtos)
             {
                 var countryCmd = new SqlCommand(
@@ -56,9 +57,9 @@ namespace Tutorial8.Controllers
                     con);
                 countryCmd.Parameters.AddWithValue("@IdTrip", trip.Id);
 
-                var countryReader = await countryCmd.ExecuteReaderAsync();
+                var countryReader = await countryCmd.ExecuteReaderAsync(cancellationToken);
 
-                while (await countryReader.ReadAsync())
+                while (await countryReader.ReadAsync(cancellationToken))
                 {
                     trip.Countries.Add(new CountryDTO
                     {
@@ -70,17 +71,6 @@ namespace Tutorial8.Controllers
             }
 
             return Ok(tripsDtos);
-        }
-
-
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetTrip(int id)
-        {
-            // if( await DoesTripExist(id)){
-            //  return NotFound();
-            // }
-            // var trip = ... GetTrip(id);
-            return Ok();
         }
     }
 }
