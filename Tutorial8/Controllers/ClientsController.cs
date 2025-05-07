@@ -62,14 +62,25 @@ namespace Tutorial8.Controllers
             return Ok(trips);
         }
         
-         [HttpGet("{id}/trips")]
+         [HttpPost]
         public async Task<IActionResult> CreateClient(ClientDTO newClient, CancellationToken cancellationToken)
         {
+            await using var con = new SqlConnection(connectionString);
+            await using var com = new SqlCommand(@"
+                    INSERT INTO Client (FirstName,LastName,Email,Telephone,Pesel) 
+                    VALUES (@FirstName,@LastName,@Email,@Telephone,@Pesel);
+                    SELECT SCOPE_IDENTITY()", con);
+            com.Parameters.AddWithValue("@FirstName", newClient.FirstName);
+            com.Parameters.AddWithValue("@LastName", newClient.LastName);
+            com.Parameters.AddWithValue("@Email", newClient.Email);
+            com.Parameters.AddWithValue("@Telephone", newClient.Telephone);
+            com.Parameters.AddWithValue("@Pesel", newClient.Pesel);
             
-
-          
-
-            return Ok();
+            await con.OpenAsync(cancellationToken);
+            
+            var result = await com.ExecuteScalarAsync(cancellationToken);
+            
+            return Ok("New client created with id: "+result);
         }
         
         
