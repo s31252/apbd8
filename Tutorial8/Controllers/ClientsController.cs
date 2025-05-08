@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Tutorial8.Models.DTOs;
 using Tutorial8.Services;
 
@@ -23,6 +22,10 @@ namespace Tutorial8.Controllers
         [HttpGet("{id}/trips")]
         public async Task<IActionResult> GetClientsTrips(int id, CancellationToken cancellationToken)
         {
+            if (id <= 0)
+                return BadRequest("Invalid client ID.");
+
+            
             var clientTrips = await _service.GetClientTrips(id, cancellationToken);
             if(!clientTrips.Any())
                 return NotFound("No trips found");
@@ -33,6 +36,18 @@ namespace Tutorial8.Controllers
          [HttpPost]
         public async Task<IActionResult> CreateClient(ClientDTO newClient, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(newClient.FirstName) ||
+                string.IsNullOrWhiteSpace(newClient.LastName) ||
+                string.IsNullOrWhiteSpace(newClient.Email) ||
+                string.IsNullOrWhiteSpace(newClient.Telephone) ||
+                string.IsNullOrWhiteSpace(newClient.Pesel) ||
+                newClient.Pesel.Length != 11 ||
+                !newClient.Email.Contains("@"))
+            {
+                return BadRequest("Invalid client data. Please check required fields and format.");
+            }
+
+            
             var newId = await _service.CreateClient(newClient, cancellationToken);
             return CreatedAtAction(nameof(GetClientsTrips), new { id = newId },"New client created with id: "+newId);
         }
@@ -41,6 +56,10 @@ namespace Tutorial8.Controllers
         [HttpPut("{idClient}/trips/{idTrip}")]
         public async Task<IActionResult> RegisterClient(int idClient,int idTrip , CancellationToken cancellationToken)
         {
+            if (idClient <= 0 || idTrip <= 0)
+                return BadRequest("Invalid client or trip ID.");
+
+            
             var success = await _service.RegisterClientToTrip(idClient, idTrip, cancellationToken);
             if(!success)
                 return Conflict("Could not register client to trip");
@@ -52,6 +71,10 @@ namespace Tutorial8.Controllers
         [HttpDelete("{idClient}/trips/{idTrip}")]
         public async Task<IActionResult> DeleteClient(int idClient,int idTrip, CancellationToken cancellationToken)
         {
+            if (idClient <= 0 || idTrip <= 0)
+                return BadRequest("Invalid client or trip ID.");
+
+            
             var success = await _service.DeleteClientFromTrip(idClient, idTrip, cancellationToken);
             if(!success)
                 return Conflict("Could not delete client from trip");
