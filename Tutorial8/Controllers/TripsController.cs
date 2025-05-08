@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using Tutorial8.Models.DTOs;
+using Tutorial8.Services;
 
 namespace Tutorial8.Controllers
 {
@@ -8,62 +7,23 @@ namespace Tutorial8.Controllers
     [ApiController]
     public class TripsController : ControllerBase
     {
+        private readonly ITripsService _tripsService;
+
+        public TripsController(ITripsService tripsService)
+        {
+            _tripsService = tripsService;
+        }
+
         private string connectionString =
             "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;";
-        
+
+
         //pobieranie wszysktich wycieczek z ich informacjami
         [HttpGet("/api/trips")]
         public async Task<IActionResult> GetTrips(CancellationToken cancellationToken)
         {
-            var tripsDtos = new List<TripDTO>();
-
-            await using var con = new SqlConnection(connectionString);
-            await con.OpenAsync(cancellationToken);
-
-            //pobieranie informacji zawartych w tabeli Trip
-            var com = new SqlCommand("SELECT * FROM Trip", con);
-            var reader = await com.ExecuteReaderAsync(cancellationToken);
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var tripDTO = new TripDTO
-                {
-                    Id = (int)reader["IdTrip"],
-                    Name = (string)reader["Name"],
-                    Description = (string)reader["Description"],
-                    DateFrom = (DateTime)reader["DateFrom"],
-                    DateTo = (DateTime)reader["DateTo"],
-                    MaxPeople = (int)reader["MaxPeople"],
-                    Countries = new List<CountryDTO>()
-                };
-
-                tripsDtos.Add(tripDTO);
-            }
-
-            await reader.CloseAsync();
-
-            //dodawanie listy państw do wycieczki
-            foreach (var trip in tripsDtos)
-            {
-                var countryCmd = new SqlCommand(
-                    "SELECT c.Name FROM Country_Trip ct JOIN Country c ON ct.IdCountry = c.IdCountry WHERE ct.IdTrip = @IdTrip",
-                    con);
-                countryCmd.Parameters.AddWithValue("@IdTrip", trip.Id);
-
-                var countryReader = await countryCmd.ExecuteReaderAsync(cancellationToken);
-
-                while (await countryReader.ReadAsync(cancellationToken))
-                {
-                    trip.Countries.Add(new CountryDTO
-                    {
-                        Name = (string)countryReader["Name"]
-                    });
-                }
-
-                await countryReader.CloseAsync();
-            }
-
-            return Ok(tripsDtos);
+            var trips = await _tripsService.GetTrips(cancellationToken);
+            return Ok(trips);
         }
     }
 }
