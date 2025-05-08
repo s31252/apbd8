@@ -1,9 +1,6 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using NuGet.Protocol.Plugins;
 using Tutorial8.Models.DTOs;
-using Tutorial8.Services;
 
 namespace Tutorial8.Controllers
 {
@@ -11,16 +8,9 @@ namespace Tutorial8.Controllers
     [ApiController]
     public class TripsController : ControllerBase
     {
-        private readonly ITripsService _tripsService;
-
         private string connectionString =
             "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;";
-
-        public TripsController(ITripsService tripsService)
-        {
-            _tripsService = tripsService;
-        }
-
+        
         //pobieranie wszysktich wycieczek z ich informacjami
         [HttpGet("/api/trips")]
         public async Task<IActionResult> GetTrips(CancellationToken cancellationToken)

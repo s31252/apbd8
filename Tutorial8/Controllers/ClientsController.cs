@@ -69,6 +69,9 @@ namespace Tutorial8.Controllers
          [HttpPost]
         public async Task<IActionResult> CreateClient(ClientDTO newClient, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(newClient.FirstName) || newClient.Pesel.Length != 11)
+                return BadRequest("Invalid input");
+
             await using var con = new SqlConnection(connectionString);
             //wstawianie do tabeli Client
             await using var com = new SqlCommand(@"
