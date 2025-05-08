@@ -11,12 +11,14 @@ namespace Tutorial8.Controllers
         private string connectionString =
             "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;";
 
+        //pobieranie wycieczek danego klienta
         [HttpGet("{id}/trips")]
         public async Task<IActionResult> GetClientsTrips(int id, CancellationToken cancellationToken)
         {
             await using var con = new SqlConnection(connectionString);
             await con.OpenAsync(cancellationToken);
-
+            
+            //sprawdzenie czy klient istnieje
             var checker = new SqlCommand("SELECT FirstName,LastName FROM Client WHERE IdClient = @id", con);
             checker.Parameters.AddWithValue("@id", id);
 
@@ -28,6 +30,7 @@ namespace Tutorial8.Controllers
             }
             await reader.CloseAsync();
 
+            //pobieranie wycieczek danego klienta
             var trips = new List<TripDTO>();
             var request = new SqlCommand(@"
                 SELECT t.IdTrip, t.Name, t.Description, t.DateFrom, t.DateTo, t.MaxPeople,
@@ -62,10 +65,12 @@ namespace Tutorial8.Controllers
             return Ok(trips);
         }
         
+        //tworzenie nowego rekordu klienta
          [HttpPost]
         public async Task<IActionResult> CreateClient(ClientDTO newClient, CancellationToken cancellationToken)
         {
             await using var con = new SqlConnection(connectionString);
+            //wstawianie do tabeli Client
             await using var com = new SqlCommand(@"
                     INSERT INTO Client (FirstName,LastName,Email,Telephone,Pesel) 
                     VALUES (@FirstName,@LastName,@Email,@Telephone,@Pesel);
@@ -83,11 +88,13 @@ namespace Tutorial8.Controllers
             return Ok("New client created with id: "+result);
         }
         
+        //rejestracja klienta na wycieczkę
         [HttpPut("{idClient}/trips/{idTrip}")]
         public async Task<IActionResult> RegisterClient(int idClient,int idTrip , CancellationToken cancellationToken)
         {
             await using var con = new SqlConnection(connectionString);
             await con.OpenAsync(cancellationToken);
+            //sprawdzenie czy klient i wycieczka istnieją oraz pobranie wartości MaxPeople do pózniejszego sprawdzenia
             var checker = new SqlCommand("SELECT 1,MaxPeople FROM Client,Trip WHERE Client.IdClient = @idClient AND Trip.IdTrip=@idTrip ", con);
             checker.Parameters.AddWithValue("@idClient", idClient);
             checker.Parameters.AddWithValue("@idTrip", idTrip);
@@ -105,20 +112,21 @@ namespace Tutorial8.Controllers
             }
             await reader.CloseAsync();
             
+            //sprawdzenie czy nie ma więcej klientów w tabeli Client_Trip dla danej wycieczki niż MaxPeople  
             var countCmd = new SqlCommand("SELECT COUNT(*) FROM Client_Trip WHERE IdTrip = @idTrip", con);
             countCmd.Parameters.AddWithValue("@idTrip", idTrip);
             var currentCount = (int)(await countCmd.ExecuteScalarAsync(cancellationToken));
             if (currentCount >= maxPeople)
                 return Conflict("Max participants reached for this trip");
             
-
+            //sprawdzenie czy klient nie jest już zarejestrowany na tą wycieczkę
             var alreadyRegistered = new SqlCommand("SELECT 1 FROM Client_Trip WHERE IdClient = @idClient AND IdTrip = @idTrip", con);
             alreadyRegistered.Parameters.AddWithValue("@idClient", idClient);
             alreadyRegistered.Parameters.AddWithValue("@idTrip", idTrip);
             if ((await alreadyRegistered.ExecuteScalarAsync(cancellationToken)) != null)
                 return Conflict("Client is already registered for this trip");
             
-
+            //wstawienie rekordu do tabeli Client_Trip
             await using var adder = new SqlCommand(@"
                 INSERT INTO Client_Trip (IdClient,IdTrip,RegisteredAt)
                 VALUES (@IdClient,@IdTrip,@RegisteredAt)",con);
@@ -127,8 +135,6 @@ namespace Tutorial8.Controllers
             var registeredAt = int.Parse(DateTime.UtcNow.ToString("yyyyMMdd"));
             adder.Parameters.AddWithValue("@RegisteredAt", registeredAt);
 
-
-
             
             await adder.ExecuteNonQueryAsync(cancellationToken);
             
@@ -136,10 +142,12 @@ namespace Tutorial8.Controllers
 
         }
 
+        //usunięcie rejestracji klienta
         [HttpDelete("{idClient}/trips/{idTrip}")]
         public async Task<IActionResult> DeleteClient(int idClient,int idTrip, CancellationToken cancellationToken)
         {
             await using var con = new SqlConnection(connectionString);
+            //sprawdzenie czy istnieje taka wycieczka i klient
             var alreadyRegistered = new SqlCommand("SELECT 1 FROM Client_Trip WHERE IdClient = @idClient AND IdTrip = @idTrip", con);
             alreadyRegistered.Parameters.AddWithValue("@idClient", idClient);
             alreadyRegistered.Parameters.AddWithValue("@idTrip", idTrip);
@@ -149,8 +157,7 @@ namespace Tutorial8.Controllers
             if (await alreadyRegistered.ExecuteScalarAsync(cancellationToken) == null)
                 return NotFound("Client is not registered for this trip");
             
-            
-            
+            //usunięcie rekordu z tabeli Client_Trip
             await using var deleter = new SqlCommand(@"
                 DELETE FROM Client_Trip
                 WHERE IdClient=@IdClient AND IdTrip=@IdTrip",con);

@@ -21,6 +21,7 @@ namespace Tutorial8.Controllers
             _tripsService = tripsService;
         }
 
+        //pobieranie wszysktich wycieczek z ich informacjami
         [HttpGet("/api/trips")]
         public async Task<IActionResult> GetTrips(CancellationToken cancellationToken)
         {
@@ -29,6 +30,7 @@ namespace Tutorial8.Controllers
             await using var con = new SqlConnection(connectionString);
             await con.OpenAsync(cancellationToken);
 
+            //pobieranie informacji zawartych w tabeli Trip
             var com = new SqlCommand("SELECT * FROM Trip", con);
             var reader = await com.ExecuteReaderAsync(cancellationToken);
 
@@ -50,6 +52,7 @@ namespace Tutorial8.Controllers
 
             await reader.CloseAsync();
 
+            //dodawanie listy państw do wycieczki
             foreach (var trip in tripsDtos)
             {
                 var countryCmd = new SqlCommand(
